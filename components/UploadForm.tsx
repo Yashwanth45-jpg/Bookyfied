@@ -15,7 +15,6 @@ import {toast} from 'sonner';
 import { checkBookExists, createBook, saveBookSegments } from '@/lib/actions/book.actions';
 import { useRouter } from 'next/navigation';
 import { parsePDFFile } from '@/lib/utils';
-import { upload } from '@vercel/blob/client';
 
 // Form validation schema
 const formSchema = z.object({
@@ -85,40 +84,76 @@ const UploadForm = () => {
             return;
         }
 
-        const uplodedPdfBlob = await upload(fileTitle, pdfFile,{
-            access:'public',
-            handleUploadUrl:'/api/upload',
-            contentType:'application/pdf'
+        // Upload PDF file
+        const pdfFormData = new FormData();
+        pdfFormData.append('file', pdfFile);
+        pdfFormData.append('filename', `${fileTitle}.pdf`);
+
+        const pdfUploadResponse = await fetch('/api/uploads', {
+            method: 'POST',
+            body: pdfFormData,
         });
+
+        if (!pdfUploadResponse.ok) {
+            const error = await pdfUploadResponse.json();
+            toast.error(error.message || 'Failed to upload PDF');
+            return;
+        }
+
+        const uploadedPdfData = await pdfUploadResponse.json();
 
         let coverURL: string;
 
         if(data.coverImage && data.coverImage.size > 0) {
+            // Upload custom cover image
+            const coverFormData = new FormData();
+            coverFormData.append('file', data.coverImage);
+            coverFormData.append('filename', `${fileTitle}_cover${data.coverImage.name.substring(data.coverImage.name.lastIndexOf('.'))}`);
 
-            const uploadedCoverBlob = await upload(`${fileTitle}_cover`, data.coverImage, {
-                access:'public',
-                handleUploadUrl:'/api/upload',
-                contentType: data.coverImage.type,
+            const coverUploadResponse = await fetch('/api/uploads', {
+                method: 'POST',
+                body: coverFormData,
             });
-            coverURL = uploadedCoverBlob.url;
+
+            if (!coverUploadResponse.ok) {
+                const error = await coverUploadResponse.json();
+                toast.error(error.message || 'Failed to upload cover image');
+                return;
+            }
+
+            const uploadedCoverData = await coverUploadResponse.json();
+            coverURL = uploadedCoverData.url;
         } else {
-
-            const response = await fetch(parsedPDF.cover)
+            // Upload auto-generated cover from PDF first page
+            const response = await fetch(parsedPDF.cover);
             const blob = await response.blob();
-            const uploadedCoverBlob = await upload(`${fileTitle}_cover`, blob, {
-                access:'public',
-                handleUploadUrl:'/api/upload',
-                contentType: blob.type,
+            
+            const coverFormData = new FormData();
+            coverFormData.append('file', blob);
+            coverFormData.append('filename', `${fileTitle}_cover.png`);
+
+            const coverUploadResponse = await fetch('/api/uploads', {
+                method: 'POST',
+                body: coverFormData,
             });
-            coverURL = uploadedCoverBlob.url;
+
+            if (!coverUploadResponse.ok) {
+                const error = await coverUploadResponse.json();
+                toast.error(error.message || 'Failed to upload cover image');
+                return;
+            }
+
+            const uploadedCoverData = await coverUploadResponse.json();
+            coverURL = uploadedCoverData.url;
         }
+        
         const book = await createBook({
             clerkId: userId,
             title: data.title,
             author: data.author,
             persona: data.voice,
-            fileURL: uplodedPdfBlob.url,
-            fileBlobKey: uplodedPdfBlob.pathname,
+            fileURL: uploadedPdfData.url,
+            fileBlobKey: uploadedPdfData.pathname,
             coverURL: coverURL,
             fileSize: pdfFile.size,
         });

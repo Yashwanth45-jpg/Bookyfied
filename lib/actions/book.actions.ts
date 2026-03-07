@@ -5,6 +5,26 @@ import { generateSlug, serializeData } from "@/lib/utils";
 import Book from "@/DataBase/models/book.model";
 import { BookSegment } from "@/DataBase/models";
 
+export const getAllBooks = async() => {
+    try {
+        await connectToDatabase();
+        const books = await Book.find().sort({ createdAt: -1 }).lean();
+
+        return {
+            success: true,
+            data: serializeData(books),
+        }
+
+    }
+    catch (error) {
+        console.error('Error fetching books:', error);
+        return {
+            success: false,
+            message: 'Failed to fetch books',
+        }
+    }
+}
+
 export const checkBookExists = async (title: string) => {
     try {   
         await connectToDatabase();
