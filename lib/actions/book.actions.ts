@@ -5,6 +5,8 @@ import { CreateBook, TextSegment } from "@/types";
 import {escapeRegex, generateSlug, serializeData} from "@/lib/utils";
 import Book from "@/DataBase/models/book.model";
 import { BookSegment } from "@/DataBase/models";
+import { revalidatePath } from "next/cache";
+
 
 export const getAllBooks = async() => {
     try {
@@ -75,6 +77,7 @@ export const createBook = async (data: CreateBook) => {
             totalSegments: 0, // Initialize totalSegments to 0 when creating a new book
         });
         await newBook.save();
+            revalidatePath('/'); // Revalidate the homepage to show the new book
         
         return {
             success: true,
