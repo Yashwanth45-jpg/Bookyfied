@@ -6,12 +6,19 @@ import {escapeRegex, generateSlug, serializeData} from "@/lib/utils";
 import Book from "@/DataBase/models/book.model";
 import { BookSegment } from "@/DataBase/models";
 import { revalidatePath } from "next/cache";
+import { getUserSubscriptionPlan } from "../subscription.server";
 
 
-export const getAllBooks = async() => {
+export const getAllBooks = async(query?: string) => {
     try {
         await connectToDatabase();
-        const books = await Book.find().sort({ createdAt: -1 }).lean();
+        const filter = query
+            ? { $or: [
+                { title: { $regex: escapeRegex(query), $options: 'i' } },
+                { author: { $regex: escapeRegex(query), $options: 'i' } },
+            ]}
+            : {};
+        const books = await Book.find(filter).sort({ createdAt: -1 }).lean();
 
         return {
             success: true,
@@ -70,7 +77,17 @@ export const createBook = async (data: CreateBook) => {
             }
         } 
 
-        //check subscription limits here
+        // Check subscription limits
+        const userPlan = await getUserSubscriptionPlan();
+        const userBookCount = await Book.countDocuments({ clerkId: data.clerkId });
+        
+        if (userBookCount >= userPlan.maxBooks) {
+            return {
+                success: false,
+                message: `You've reached your plan limit of ${userPlan.maxBooks} book${userPlan.maxBooks !== 1 ? 's' : ''}. Please upgrade your plan to add more books.`,
+            }
+        }
+
         const newBook = new Book({
             ...data,
             slug,

@@ -159,7 +159,7 @@ const UploadForm = () => {
         });
 
         if(!book.success) {
-            toast.error('Failed to create book. Please try again.');
+            toast.error(book.message || 'Failed to create book. Please try again.');
             return;
         }
         if(book.alreadyExists) {

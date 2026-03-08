@@ -2,16 +2,45 @@
 import React from 'react';
 import Image from 'next/image';
 import { Mic, MicOff } from "lucide-react";
-import useVapi from '@/app/hooks/useVapi';
+import useVapi, { CallStatus } from '@/app/hooks/useVapi';
 import { IBook } from '@/types';
 import Transcript from './Transcript';
 
+const STATUS_LABELS: Record<CallStatus, string> = {
+    idle: 'Ready',
+    connecting: 'Connecting…',
+    starting: 'Starting…',
+    listening: 'Listening…',
+    thinking: 'Thinking…',
+    speaking: 'Speaking…',
+};
+
+const formatTime = (seconds: number): string => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+};
+
 const VapiControls = ({ book }: { book: IBook }) => {
-    const { status, isActive, messages, currentMessage, currentUserMessage, duration, limitError,
-        start, stop, clearError } = useVapi(book);
+    const { status, isActive, messages, currentMessage, currentUserMessage, duration,
+        maxDurationSeconds, limitError, start, stop, clearError } = useVapi(book);
+
+    const statusLabel = STATUS_LABELS[status] ?? 'Ready';
+    const statusDotClass = `vapi-status-dot vapi-status-dot-${status === 'idle' ? 'ready' : status}`;
+
     return (
         <>
             <div className="max-w-4xl mx-auto space-y-6">
+                {/* Limit error banner */}
+                {limitError && (
+                    <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                        <span>{limitError}</span>
+                        <button onClick={clearError} className="ml-4 font-semibold underline">
+                            Dismiss
+                        </button>
+                    </div>
+                )}
+
                 {/* Header card */}
                 <div className="vapi-header-card">
                     {/* Book cover with mic button */}
@@ -45,7 +74,7 @@ const VapiControls = ({ book }: { book: IBook }) => {
                     </div>
 
                     {/* Book info and badges */}
-                    <div className="flex-1 flex flex-col gap-4">
+                    <div className="flex-1 flex flex-col gap-4 items-center text-center sm:items-start sm:text-left">
                         <div>
                             <h1 className="text-2xl sm:text-3xl font-bold text-(--text-primary) font-serif">
                                 {book.title}
@@ -56,11 +85,11 @@ const VapiControls = ({ book }: { book: IBook }) => {
                         </div>
 
                         {/* Badges row */}
-                        <div className="flex flex-wrap items-center gap-2">
-                            {/* Status indicator */}
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                            {/* Dynamic status indicator */}
                             <div className="vapi-status-indicator">
-                                <span className="vapi-status-dot vapi-status-dot-ready" />
-                                <span className="vapi-status-text">Ready</span>
+                                <span className={statusDotClass} />
+                                <span className="vapi-status-text">{statusLabel}</span>
                             </div>
 
                             {/* Voice label */}
@@ -68,9 +97,11 @@ const VapiControls = ({ book }: { book: IBook }) => {
                                 <span className="vapi-status-text">Voice: {book.persona}</span>
                             </div>
 
-                            {/* Timer */}
+                            {/* Live timer */}
                             <div className="vapi-status-indicator">
-                                <span className="vapi-status-text">0:00/15:00</span>
+                                <span className="vapi-status-text">
+                                    {formatTime(duration)} / {formatTime(maxDurationSeconds)}
+                                </span>
                             </div>
                         </div>
                     </div>

@@ -203,10 +203,10 @@
     @apply !mt-3 text-center text-lg;
   }
   .new-book {
-    @apply max-w-7xl px-5 mx-auto w-full space-y-6 py-18 min-h-screen;
+    @apply max-w-7xl px-5 mx-auto w-full space-y-6 py-10 sm:py-18 min-h-screen;
   }
   .new-book-wrapper {
-    @apply mx-auto max-w-2xl space-y-6 mt-12 mb-20;
+    @apply mx-auto max-w-2xl space-y-6 mt-6 sm:mt-12 mb-12 sm:mb-20;
   }
   .file-upload-shadow {
     @apply relative z-20 flex flex-col justify-center items-center p-7;
@@ -384,13 +384,13 @@
      VAPI CONTROLS COMPONENT
      =========================================== */
   .vapi-header-card {
-    @apply flex items-center gap-6 bg-[#f3e4c7] rounded-[14px] p-6 relative overflow-hidden;
+    @apply flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 bg-[#f3e4c7] rounded-[14px] p-4 sm:p-6 relative overflow-hidden;
   }
   .vapi-compact-header {
     @apply flex items-center gap-2 bg-[#f3e4c7] rounded-[14px] p-3 mb-3;
   }
   .vapi-transcript-wrapper {
-    @apply min-h-[400px] max-h-[60vh] flex flex-col;
+    @apply min-h-[280px] sm:min-h-[400px] max-h-[55vh] sm:max-h-[60vh] flex flex-col;
   }
   .vapi-cover-wrapper {
     @apply relative shrink-0;
@@ -552,7 +552,7 @@
     @apply flex-1 py-2 px-4 outline-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)];
   }
   .library-books-grid {
-    @apply grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-3 md:gap-x-10 gap-y-7 md:gap-y-9 pb-16 md:pb-20;
+    @apply grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-3 md:gap-x-8 gap-y-6 md:gap-y-9 pb-12 md:pb-20;
   }
   .library-empty-card {
     @apply bg-[var(--bg-secondary)] rounded-[14px] p-12 max-w-md mx-auto;
@@ -592,7 +592,7 @@
     @apply flex justify-start;
   }
   .transcript-bubble {
-    @apply max-w-[80%] px-6 py-4 text-base font-medium leading-7 rounded-2xl;
+    @apply max-w-[88%] sm:max-w-[80%] px-4 sm:px-6 py-3 sm:py-4 text-sm sm:text-base font-medium leading-6 sm:leading-7 rounded-2xl;
   }
   .transcript-bubble-user {
     @apply bg-[#663820] text-white rounded-br-sm;
@@ -726,7 +726,7 @@
      BACK BUTTON (FLOATING)
      =========================================== */
   .back-btn-floating {
-    @apply fixed top-24 left-6 z-50 size-12 rounded-full bg-white border border-[var(--border-subtle)] flex items-center justify-center transition-all;
+    @apply fixed top-20 sm:top-24 left-3 sm:left-6 z-50 size-10 sm:size-12 rounded-full bg-white border border-[var(--border-subtle)] flex items-center justify-center transition-all;
     box-shadow: var(--shadow-soft);
 
     &:hover {
