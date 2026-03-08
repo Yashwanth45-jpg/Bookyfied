@@ -2,12 +2,14 @@ import HeroSection from '@/components/HeroSection'
 import BookCard from '@/components/BookCard';
 import Search from '@/components/Search';
 import { getAllBooks } from '@/lib/actions/book.actions';
+import { auth } from '@clerk/nextjs/server';
 
 export const dynamic = 'force-dynamic';
 
 const page = async ({ searchParams }: { searchParams: Promise<{ query?: string }> }) => {
+  const { userId } = await auth();
   const { query } = await searchParams;
-  const bookResults = await getAllBooks(query);
+  const bookResults = userId ? await getAllBooks(userId, query) : { success: false, data: [] };
   const books = bookResults.success ? bookResults.data ?? [] : [];
 
   return (

@@ -9,15 +9,16 @@ import { revalidatePath } from "next/cache";
 import { getUserSubscriptionPlan } from "../subscription.server";
 
 
-export const getAllBooks = async(query?: string) => {
+export const getAllBooks = async(clerkId: string, query?: string) => {
     try {
         await connectToDatabase();
-        const filter = query
-            ? { $or: [
+        const filter: Record<string, unknown> = { clerkId };
+        if (query) {
+            filter.$or = [
                 { title: { $regex: escapeRegex(query), $options: 'i' } },
                 { author: { $regex: escapeRegex(query), $options: 'i' } },
-            ]}
-            : {};
+            ];
+        }
         const books = await Book.find(filter).sort({ createdAt: -1 }).lean();
 
         return {
