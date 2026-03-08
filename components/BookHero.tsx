@@ -620,7 +620,7 @@ function OpenBook({
   const rightContent = getRight(currentPage, animKey, isSignedIn);
 
   return (
-    <div style={{ perspective: '1600px', perspectiveOrigin: '50% 40%' }}>
+    <div style={{ perspective: '1600px', perspectiveOrigin: '50% 40%', width: '100%' }}>
       <div
         className="relative w-full max-w-7xl mx-auto rounded-xl overflow-hidden"
         style={{
@@ -762,7 +762,7 @@ function MobileBook({
   currentPage: number; animKey: number; isSignedIn: boolean; flip: FlipState;
 }) {
   return (
-    <div className="relative w-full flex-1" style={{ perspective: '900px', perspectiveOrigin: '50% 50%' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', perspective: '900px', perspectiveOrigin: '50% 50%' }}>
       {/* Full-bleed parchment page */}
       <div
         className="absolute inset-0 overflow-hidden"
@@ -916,6 +916,12 @@ export default function BookHero({ isSignedIn }: { isSignedIn: boolean }) {
   }, []);
 
   const chapterIndex = CHAPTERS.findIndex((c) => c.pages.includes(displayPage));
+  const [showHint, setShowHint] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setShowHint(false), 3800);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <>
@@ -951,6 +957,15 @@ export default function BookHero({ isSignedIn }: { isSignedIn: boolean }) {
           0%   { opacity: 0; }
           100% { opacity: 1; }
         }
+        /* Hint toast */
+        @keyframes hintIn {
+          from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        @keyframes hintOut {
+          from { opacity: 1; transform: translateX(-50%) translateY(0); }
+          to   { opacity: 0; transform: translateX(-50%) translateY(12px); }
+        }
         /* Mobile: 180° forward flip (top-pivot, rotateX) */
         @keyframes mflipF1 {
           0%   { transform: perspective(900px) rotateX(0deg); }
@@ -984,7 +999,10 @@ export default function BookHero({ isSignedIn }: { isSignedIn: boolean }) {
       {/* Full-screen fixed canvas — nothing scrolls */}
       <div
         className="fixed inset-0 flex flex-col overflow-hidden"
-        style={{ background: isMobile ? '#f0ddb8' : '#1c1208',
+        style={{
+          background: isMobile ? '#f0ddb8' : '#1c1208',
+          alignItems: isMobile ? 'stretch' : 'center',
+          justifyContent: isMobile ? 'stretch' : 'center',
           paddingTop: isMobile ? 0 : '24px',
           paddingBottom: isMobile ? 0 : '24px',
           paddingLeft: isMobile ? 0 : '16px',
@@ -1012,21 +1030,16 @@ export default function BookHero({ isSignedIn }: { isSignedIn: boolean }) {
           )}
         </div>
 
-        {/* Chapter label — desktop centered, mobile top strip */}
-        <p
-          className="relative flex-none text-[10px] font-bold uppercase tracking-[0.2em] select-none"
+        {/* Book */}
+        <div
           style={{
-            color: isMobile ? '#8b7355aa' : '#c9b99a60',
-            textAlign: 'center',
-            padding: isMobile ? '10px 16px 8px' : undefined,
-            marginBottom: isMobile ? 0 : undefined,
+          position: 'relative',
+            width: '100%',
+            flex: isMobile ? '1 1 0' : '0 0 auto',
+            minHeight: 0,
+            height: isMobile ? undefined : 'auto',
           }}
         >
-          {CHAPTERS[chapterIndex]?.title ?? 'Bookyfied'} &nbsp;·&nbsp; {isMobile ? 'swipe up / down' : 'scroll'} to turn pages
-        </p>
-
-        {/* Book */}
-        <div className="relative flex justify-center" style={{ flex: isMobile ? '1 1 0' : undefined, width: '100%', minHeight: 0 }}>
           {isMobile
             ? <MobileBook currentPage={displayPage} animKey={animKey} isSignedIn={isSignedIn} flip={flip} />
             : <OpenBook currentPage={displayPage} animKey={animKey} isSignedIn={isSignedIn} flip={flip} />
@@ -1036,7 +1049,7 @@ export default function BookHero({ isSignedIn }: { isSignedIn: boolean }) {
         {/* Chapter dots */}
         <div
           className="relative flex-none flex items-center justify-center gap-2"
-          style={{ padding: isMobile ? '8px 16px 10px' : undefined, marginTop: isMobile ? 0 : '12px' }}
+          style={{ padding: isMobile ? '8px 16px 10px' : '12px 0 0 0' }}
         >
           {CHAPTERS.map((ch, i) => {
             const isActive = i === chapterIndex;
@@ -1058,14 +1071,63 @@ export default function BookHero({ isSignedIn }: { isSignedIn: boolean }) {
         </div>
 
         <p className="relative flex-none text-[9px] select-none"
-          style={{ color: isMobile ? 'rgba(139,96,64,0.45)' : 'rgba(201,185,154,0.3)',
+          style={{
+            color: isMobile ? 'rgba(139,96,64,0.45)' : 'rgba(201,185,154,0.3)',
             textAlign: 'center',
-            paddingBottom: isMobile ? '6px' : '0',
-            marginTop: isMobile ? 0 : '8px',
+            padding: isMobile ? '0 0 6px 0' : '4px 0 0 0',
           }}>
           page {displayPage + 1} of {TOTAL_PAGES}
         </p>
       </div>
+
+      {/* Hint toast — fades in on load, fades out after 3.2s */}
+      {showHint && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 68,
+            left: '50%',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '9px 20px',
+            borderRadius: 999,
+            background: isMobile ? 'rgba(92,60,28,0.88)' : 'rgba(28,18,8,0.72)',
+            border: `1px solid ${isMobile ? 'rgba(184,149,106,0.4)' : 'rgba(201,185,154,0.28)'}`,
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
+            boxShadow: '0 4px 28px rgba(0,0,0,0.32)',
+            animation: 'hintIn 0.5s ease forwards, hintOut 0.6s ease 3.2s forwards',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+            stroke={isMobile ? '#f5e6c8' : '#c9b99a'} strokeWidth="2.2"
+            strokeLinecap="round" strokeLinejoin="round"
+          >
+            {isMobile ? (
+              <>
+                <polyline points="18 15 12 9 6 15" />
+                <polyline points="18 21 12 15 6 21" />
+              </>
+            ) : (
+              <>
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="13 18 19 12 13 6" />
+              </>
+            )}
+          </svg>
+          <span style={{
+            fontSize: 11, fontWeight: 600,
+            letterSpacing: '0.07em', fontFamily: 'sans-serif',
+            color: isMobile ? '#f5e6c8' : '#c9b99a',
+          }}>
+            {isMobile ? 'Swipe up / down to turn pages' : 'Scroll to turn pages'}
+          </span>
+        </div>
+      )}
     </>
   );
 }
