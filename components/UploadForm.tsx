@@ -132,9 +132,15 @@ const UploadForm = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ bookId: book.data._id, pdfUrl: uploadedPdfBlob.url }),
             });
-            const segments = await segRes.json();
 
-            if (!segments.success) {
+            let segments: { success: boolean; message?: string } = { success: false, message: 'No response from server' };
+            try {
+                segments = await segRes.json();
+            } catch {
+                // empty body or non-JSON (e.g. 405/502 from Vercel edge)
+            }
+
+            if (!segRes.ok || !segments.success) {
                 toast.error(segments.message ?? 'Failed to save book segments. Please try again.');
                 return;
             }

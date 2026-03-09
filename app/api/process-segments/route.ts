@@ -4,7 +4,6 @@ import { connectToDatabase } from '@/DataBase/mongoose';
 import { BookSegment } from '@/DataBase/models';
 import Book from '@/DataBase/models/book.model';
 import { splitIntoSegments } from '@/lib/utils';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 export const maxDuration = 60; // seconds — Vercel Pro allows up to 300
 
@@ -30,7 +29,11 @@ export async function POST(request: Request): Promise<NextResponse> {
         if (!pdfRes.ok) throw new Error(`Failed to fetch PDF: ${pdfRes.status}`);
         const arrayBuffer = await pdfRes.arrayBuffer();
 
-        // Extract text using pdfjs-dist legacy Node.js build (no canvas, no worker)
+        // Dynamic import keeps pdfjs-dist out of the bundle graph —
+        // static top-level imports of .mjs files crash Vercel's bundler at deploy.
+        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs' as string);
+        const getDocument = pdfjsLib.getDocument ?? (pdfjsLib as any).default?.getDocument;
+
         const loadingTask = getDocument({
             data: new Uint8Array(arrayBuffer),
             useWorkerFetch: false,
