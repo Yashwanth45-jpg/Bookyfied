@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Keep pdfjs-dist unbundled on the server so the legacy Node.js build works
+  serverExternalPackages: ['pdfjs-dist'],
   images: { remotePatterns:
     [{
       protocol: 'https',

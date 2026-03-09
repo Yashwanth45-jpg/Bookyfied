@@ -1,8 +1,8 @@
 'use server';
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/DataBase/mongoose";
-import { CreateBook, TextSegment } from "@/types";
-import {escapeRegex, generateSlug, serializeData} from "@/lib/utils";
+import { CreateBook } from "@/types";
+import {escapeRegex, generateSlug, serializeData, splitIntoSegments} from "@/lib/utils";
 import Book from "@/DataBase/models/book.model";
 import { BookSegment } from "@/DataBase/models";
 import { revalidatePath } from "next/cache";
@@ -44,21 +44,27 @@ export const checkBookExists = async (title: string) => {
         if (existingBook) {     
             return {
                 success: true,
+                exists: true,
+                book: serializeData(existingBook),
                 data: serializeData(existingBook),                  
                 message: 'A book with the same title already exists.',
             }
         }
         return {
             success: true,
+            exists: false,
+            book: null,
             data: null,
             message: 'No book with the same title exists.',
         }
     }
     catch (error) {
         console.error('Error checking book existence:', error);
-
         return {
             success: false,
+            exists: false,
+            book: null,
+            data: null,
             message: 'Failed to check book existence',
         }
     }   
@@ -85,17 +91,18 @@ export const createBook = async (data: CreateBook) => {
         if (userBookCount >= userPlan.maxBooks) {
             return {
                 success: false,
-                message: `You've reached your plan limit of ${userPlan.maxBooks} book${userPlan.maxBooks !== 1 ? 's' : ''}. Please upgrade your plan to add more books.`,
+                error: `You've reached your plan limit of ${userPlan.maxBooks} book${userPlan.maxBooks !== 1 ? 's' : ''}. Please upgrade your plan to add more books.`,
+                isBillingError: true,
             }
         }
 
         const newBook = new Book({
             ...data,
             slug,
-            totalSegments: 0, // Initialize totalSegments to 0 when creating a new book
+            totalSegments: 0,
         });
         await newBook.save();
-            revalidatePath('/'); // Revalidate the homepage to show the new book
+        revalidatePath('/');
         
         return {
             success: true,
@@ -107,16 +114,55 @@ export const createBook = async (data: CreateBook) => {
         console.error('Error creating book:', error);
         return {
             success: false,
-            message: 'Failed to create book',
+            error: 'Failed to create book',
+            isBillingError: false,
         }
     }   
 };
 
-export const saveBookSegments = async (bookId: string, clerkId:string, segments:TextSegment[]) => {
+/**
+ * Fetches the PDF from Vercel Blob server-side, extracts text, and saves
+ * segments to MongoDB. This avoids passing large payloads through server actions.
+ */
+export const processAndSaveSegments = async (bookId: string, clerkId: string, pdfUrl: string) => {
     try {
         await connectToDatabase();
-        console.log('Saving segments for bookId:', bookId, 'clerkId:', clerkId, 'number of segments:', segments.length);
-        const SegmentsToInsert = segments.map(({ text, segmentIndex, pageNumber, wordCount }) => ({
+
+        // Fetch PDF from Vercel Blob (server-to-server, no size limit issues)
+        const response = await fetch(pdfUrl);
+        if (!response.ok) throw new Error(`Failed to fetch PDF: ${response.status}`);
+        const arrayBuffer = await response.arrayBuffer();
+
+        // Use pdfjs-dist legacy build for Node.js (text extraction only, no canvas)
+        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        const loadingTask = pdfjsLib.getDocument({
+            data: new Uint8Array(arrayBuffer),
+            useWorkerFetch: false,
+            isEvalSupported: false,
+            useSystemFonts: true,
+        } as Parameters<typeof pdfjsLib.getDocument>[0]);
+        const pdfDoc = await loadingTask.promise;
+
+        let fullText = '';
+        for (let i = 1; i <= pdfDoc.numPages; i++) {
+            const page = await pdfDoc.getPage(i);
+            const content = await page.getTextContent();
+            const pageText = (content.items as Array<{ str?: string }>)
+                .filter((item) => item.str !== undefined)
+                .map((item) => item.str)
+                .join(' ');
+            fullText += pageText + '\n';
+        }
+        await pdfDoc.destroy();
+
+        const segments = splitIntoSegments(fullText);
+
+        if (segments.length === 0) {
+            await Book.findByIdAndDelete(bookId);
+            return { success: false, message: 'No text content found in PDF' };
+        }
+
+        const segmentsToInsert = segments.map(({ text, segmentIndex, pageNumber, wordCount }) => ({
             content: text,
             segmentIndex,
             pageNumber,
@@ -124,24 +170,17 @@ export const saveBookSegments = async (bookId: string, clerkId:string, segments:
             bookId,
             clerkId,
         }));
-        await BookSegment.insertMany(SegmentsToInsert);
-        await Book.findByIdAndUpdate(bookId, { $inc: { totalSegments: segments.length } });
-        const book = await Book.findById(bookId);
-        await book.save();
-        return {
-            success: true,
-            data:{ totalSegments: book.totalSegments },
-            message: 'Book segments saved successfully',
-        }
-    }
-    catch (error) {
-        console.error('Error saving book segments:', error);
-        await BookSegment.deleteMany({ bookId}); // Rollback any saved segments for this book and clerk
-        await Book.findByIdAndDelete(bookId); // Rollback the created book
-        return {
-            success: false,
-            message: 'Failed to save book segments',
-        }
+
+        await BookSegment.insertMany(segmentsToInsert);
+        await Book.findByIdAndUpdate(bookId, { totalSegments: segments.length });
+        revalidatePath('/');
+
+        return { success: true, totalSegments: segments.length };
+    } catch (error) {
+        console.error('Error processing segments:', error);
+        await BookSegment.deleteMany({ bookId });
+        await Book.findByIdAndDelete(bookId);
+        return { success: false, message: 'Failed to process book segments' };
     }
 };
 
