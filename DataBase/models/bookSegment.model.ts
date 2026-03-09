@@ -1,6 +1,5 @@
 import { IBookSegment } from "@/types";
 import mongoose, { Schema } from "mongoose";
-import { unique } from "next/dist/build/utils";
 
 const BookSegmentSchema = new mongoose.Schema<IBookSegment>({
   clerkId: { type: String, required: true },
