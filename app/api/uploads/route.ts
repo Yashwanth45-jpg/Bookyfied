@@ -1,68 +1,55 @@
 import { MAX_FILE_SIZE } from "@/constants";
 import { auth } from "@clerk/nextjs/server";
-import { put } from "@vercel/blob";
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 
-export async function POST(request: Request) : Promise<NextResponse> {
-    // Verify token is available
+export async function POST(request: Request): Promise<NextResponse> {
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
         console.error('BLOB_READ_WRITE_TOKEN is not configured');
-        return NextResponse.json({ 
-            success: false, 
-            message: 'Blob storage token not configured' 
+        return NextResponse.json({
+            success: false,
+            message: 'Blob storage token not configured'
         }, { status: 500 });
     }
 
-    // Check authentication
-    const {userId} = await auth();
-    if(!userId) {
-        return NextResponse.json({ 
-            success: false, 
-            message: 'User not authenticated' 
+    const { userId } = await auth();
+    if (!userId) {
+        return NextResponse.json({
+            success: false,
+            message: 'User not authenticated'
         }, { status: 401 });
     }
 
+    const body = (await request.json()) as HandleUploadBody;
+
     try {
-        const formData = await request.formData();
-        const file = formData.get('file') as File;
-        const filename = formData.get('filename') as string;
-
-        if (!file) {
-            return NextResponse.json({ 
-                success: false, 
-                message: 'No file provided' 
-            }, { status: 400 });
-        }
-
-        // Validate file size
-        if (file.size > MAX_FILE_SIZE) {
-            return NextResponse.json({ 
-                success: false, 
-                message: 'File size exceeds maximum allowed size' 
-            }, { status: 400 });
-        }
-
-        // Upload to Vercel Blob
-        const blob = await put(filename || file.name, file, {
-            access: 'public',
-            token: process.env.BLOB_READ_WRITE_TOKEN!,
-            addRandomSuffix: true, // Prevent filename collisions
+        const jsonResponse = await handleUpload({
+            body,
+            request,
+            onBeforeGenerateToken: async (_pathname) => {
+                return {
+                    allowedContentTypes: [
+                        'application/pdf',
+                        'image/jpeg',
+                        'image/jpg',
+                        'image/png',
+                        'image/webp',
+                    ],
+                    maximumSizeInBytes: MAX_FILE_SIZE,
+                    tokenPayload: JSON.stringify({ userId }),
+                };
+            },
+            onUploadCompleted: async ({ blob }) => {
+                console.log('File uploaded to Blob:', blob.url);
+            },
         });
 
-        console.log('File uploaded to Blob:', blob.url);
-
-        return NextResponse.json({ 
-            success: true, 
-            url: blob.url,
-            pathname: blob.pathname,
-            downloadUrl: blob.downloadUrl 
-        }, { status: 200 });
-    }
-    catch(e) {
+        return NextResponse.json(jsonResponse);
+    } catch (e) {
         console.error('Error handling upload:', e);
-        return NextResponse.json({ 
-            success: false, 
-            message: 'Failed to handle upload' 
-        }, { status: 500 });
+        return NextResponse.json({
+            success: false,
+            message: 'Failed to handle upload'
+        }, { status: 400 });
     }
 }

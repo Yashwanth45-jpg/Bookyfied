@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import LoadingOverlay from '@/components/LoadingOverlay';
 import { voiceOptions, MAX_FILE_SIZE, ACCEPTED_PDF_TYPES, MAX_IMAGE_SIZE, ACCEPTED_IMAGE_TYPES } from '@/constants';
+import { upload } from '@vercel/blob/client';
 import { useAuth } from '@clerk/nextjs';
 import {toast} from 'sonner';
 import { checkBookExists, createBook, saveBookSegments } from '@/lib/actions/book.actions';
@@ -84,66 +85,30 @@ const UploadForm = () => {
             return;
         }
 
-        // Upload PDF file
-        const pdfFormData = new FormData();
-        pdfFormData.append('file', pdfFile);
-        pdfFormData.append('filename', `${fileTitle}.pdf`);
-
-        const pdfUploadResponse = await fetch('/api/uploads', {
-            method: 'POST',
-            body: pdfFormData,
+        // Upload PDF file directly to Vercel Blob (bypasses server body size limit)
+        const uploadedPdfData = await upload(`${fileTitle}.pdf`, pdfFile, {
+            access: 'public',
+            handleUploadUrl: '/api/uploads',
         });
-
-        if (!pdfUploadResponse.ok) {
-            const error = await pdfUploadResponse.json();
-            toast.error(error.message || 'Failed to upload PDF');
-            return;
-        }
-
-        const uploadedPdfData = await pdfUploadResponse.json();
 
         let coverURL: string;
 
         if(data.coverImage && data.coverImage.size > 0) {
-            // Upload custom cover image
-            const coverFormData = new FormData();
-            coverFormData.append('file', data.coverImage);
-            coverFormData.append('filename', `${fileTitle}_cover${data.coverImage.name.substring(data.coverImage.name.lastIndexOf('.'))}`);
-
-            const coverUploadResponse = await fetch('/api/uploads', {
-                method: 'POST',
-                body: coverFormData,
+            // Upload custom cover image directly to Vercel Blob
+            const coverExt = data.coverImage.name.substring(data.coverImage.name.lastIndexOf('.'));
+            const uploadedCoverData = await upload(`${fileTitle}_cover${coverExt}`, data.coverImage, {
+                access: 'public',
+                handleUploadUrl: '/api/uploads',
             });
-
-            if (!coverUploadResponse.ok) {
-                const error = await coverUploadResponse.json();
-                toast.error(error.message || 'Failed to upload cover image');
-                return;
-            }
-
-            const uploadedCoverData = await coverUploadResponse.json();
             coverURL = uploadedCoverData.url;
         } else {
-            // Upload auto-generated cover from PDF first page
+            // Upload auto-generated cover from PDF first page directly to Vercel Blob
             const response = await fetch(parsedPDF.cover);
             const blob = await response.blob();
-            
-            const coverFormData = new FormData();
-            coverFormData.append('file', blob);
-            coverFormData.append('filename', `${fileTitle}_cover.png`);
-
-            const coverUploadResponse = await fetch('/api/uploads', {
-                method: 'POST',
-                body: coverFormData,
+            const uploadedCoverData = await upload(`${fileTitle}_cover.png`, blob, {
+                access: 'public',
+                handleUploadUrl: '/api/uploads',
             });
-
-            if (!coverUploadResponse.ok) {
-                const error = await coverUploadResponse.json();
-                toast.error(error.message || 'Failed to upload cover image');
-                return;
-            }
-
-            const uploadedCoverData = await coverUploadResponse.json();
             coverURL = uploadedCoverData.url;
         }
         
