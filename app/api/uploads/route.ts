@@ -4,22 +4,6 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request): Promise<NextResponse> {
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-        console.error('BLOB_READ_WRITE_TOKEN is not configured');
-        return NextResponse.json({
-            success: false,
-            message: 'Blob storage token not configured'
-        }, { status: 500 });
-    }
-
-    const { userId } = await auth();
-    if (!userId) {
-        return NextResponse.json({
-            success: false,
-            message: 'User not authenticated'
-        }, { status: 401 });
-    }
-
     const body = (await request.json()) as HandleUploadBody;
 
     try {
@@ -27,6 +11,14 @@ export async function POST(request: Request): Promise<NextResponse> {
             body,
             request,
             onBeforeGenerateToken: async (_pathname) => {
+                // Auth check only runs for token-generation requests (user → server)
+                if (!process.env.BLOB_READ_WRITE_TOKEN) {
+                    throw new Error('Blob storage token not configured');
+                }
+                const { userId } = await auth();
+                if (!userId) {
+                    throw new Error('User not authenticated');
+                }
                 return {
                     allowedContentTypes: [
                         'application/pdf',
@@ -40,6 +32,8 @@ export async function POST(request: Request): Promise<NextResponse> {
                 };
             },
             onUploadCompleted: async ({ blob }) => {
+                // Called by Vercel Blob server-to-server — no user session here.
+                // Signature is verified automatically by handleUpload.
                 console.log('File uploaded to Blob:', blob.url);
             },
         });
@@ -49,7 +43,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         console.error('Error handling upload:', e);
         return NextResponse.json({
             success: false,
-            message: 'Failed to handle upload'
+            message: e instanceof Error ? e.message : 'Failed to handle upload',
         }, { status: 400 });
     }
 }
