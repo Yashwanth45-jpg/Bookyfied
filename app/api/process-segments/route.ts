@@ -4,8 +4,13 @@ import { connectToDatabase } from '@/DataBase/mongoose';
 import { BookSegment } from '@/DataBase/models';
 import Book from '@/DataBase/models/book.model';
 import { splitIntoSegments } from '@/lib/utils';
+import * as pdfParseModule from 'pdf-parse';
 
-export const maxDuration = 60; // seconds — Vercel Pro allows up to 300
+// pdf-parse ships both CJS and ESM; handle either export shape
+const pdfParse: (buf: Buffer) => Promise<{ text: string }> =
+    (pdfParseModule as any).default ?? (pdfParseModule as any).parse ?? pdfParseModule;
+
+export const maxDuration = 60;
 
 export async function POST(request: Request): Promise<NextResponse> {
     const { userId } = await auth();
@@ -29,30 +34,9 @@ export async function POST(request: Request): Promise<NextResponse> {
         if (!pdfRes.ok) throw new Error(`Failed to fetch PDF: ${pdfRes.status}`);
         const arrayBuffer = await pdfRes.arrayBuffer();
 
-        // Dynamic import keeps pdfjs-dist out of the bundle graph —
-        // static top-level imports of .mjs files crash Vercel's bundler at deploy.
-        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs' as string);
-        const getDocument = pdfjsLib.getDocument ?? (pdfjsLib as any).default?.getDocument;
-
-        const loadingTask = getDocument({
-            data: new Uint8Array(arrayBuffer),
-            useWorkerFetch: false,
-            isEvalSupported: false,
-            useSystemFonts: true,
-        } as Parameters<typeof getDocument>[0]);
-        const pdfDoc = await loadingTask.promise;
-
-        let fullText = '';
-        for (let i = 1; i <= pdfDoc.numPages; i++) {
-            const page = await pdfDoc.getPage(i);
-            const content = await page.getTextContent();
-            const pageText = (content.items as Array<{ str?: string }>)
-                .filter((item) => item.str !== undefined)
-                .map((item) => item.str!)
-                .join(' ');
-            fullText += pageText + '\n';
-        }
-        await pdfDoc.destroy();
+        // pdf-parse: pure Node.js PDF text extraction, no canvas/worker needed
+        const data = await pdfParse(Buffer.from(arrayBuffer));
+        const fullText = data.text;
 
         const segments = splitIntoSegments(fullText);
 
