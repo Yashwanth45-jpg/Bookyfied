@@ -2,7 +2,7 @@
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/DataBase/mongoose";
 import { CreateBook } from "@/types";
-import {escapeRegex, generateSlug, serializeData, splitIntoSegments} from "@/lib/utils";
+import {escapeRegex, generateSlug, serializeData} from "@/lib/utils";
 import Book from "@/DataBase/models/book.model";
 import { BookSegment } from "@/DataBase/models";
 import { revalidatePath } from "next/cache";
@@ -123,66 +123,10 @@ export const createBook = async (data: CreateBook) => {
 /**
  * Fetches the PDF from Vercel Blob server-side, extracts text, and saves
  * segments to MongoDB. This avoids passing large payloads through server actions.
+ * NOTE: Moved to /api/process-segments route to avoid Turbopack bundling issues
+ * with dynamic pdfjs-dist imports inside server actions.
  */
-export const processAndSaveSegments = async (bookId: string, clerkId: string, pdfUrl: string) => {
-    try {
-        await connectToDatabase();
-
-        // Fetch PDF from Vercel Blob (server-to-server, no size limit issues)
-        const response = await fetch(pdfUrl);
-        if (!response.ok) throw new Error(`Failed to fetch PDF: ${response.status}`);
-        const arrayBuffer = await response.arrayBuffer();
-
-        // Use pdfjs-dist legacy build for Node.js (text extraction only, no canvas)
-        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-        const loadingTask = pdfjsLib.getDocument({
-            data: new Uint8Array(arrayBuffer),
-            useWorkerFetch: false,
-            isEvalSupported: false,
-            useSystemFonts: true,
-        } as Parameters<typeof pdfjsLib.getDocument>[0]);
-        const pdfDoc = await loadingTask.promise;
-
-        let fullText = '';
-        for (let i = 1; i <= pdfDoc.numPages; i++) {
-            const page = await pdfDoc.getPage(i);
-            const content = await page.getTextContent();
-            const pageText = (content.items as Array<{ str?: string }>)
-                .filter((item) => item.str !== undefined)
-                .map((item) => item.str)
-                .join(' ');
-            fullText += pageText + '\n';
-        }
-        await pdfDoc.destroy();
-
-        const segments = splitIntoSegments(fullText);
-
-        if (segments.length === 0) {
-            await Book.findByIdAndDelete(bookId);
-            return { success: false, message: 'No text content found in PDF' };
-        }
-
-        const segmentsToInsert = segments.map(({ text, segmentIndex, pageNumber, wordCount }) => ({
-            content: text,
-            segmentIndex,
-            pageNumber,
-            wordCount,
-            bookId,
-            clerkId,
-        }));
-
-        await BookSegment.insertMany(segmentsToInsert);
-        await Book.findByIdAndUpdate(bookId, { totalSegments: segments.length });
-        revalidatePath('/');
-
-        return { success: true, totalSegments: segments.length };
-    } catch (error) {
-        console.error('Error processing segments:', error);
-        await BookSegment.deleteMany({ bookId });
-        await Book.findByIdAndDelete(bookId);
-        return { success: false, message: 'Failed to process book segments' };
-    }
-};
+// processAndSaveSegments is now handled by POST /api/process-segments
 
 export const getBookBySlug = async (slug: string) => {
     try {

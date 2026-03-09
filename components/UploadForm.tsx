@@ -15,7 +15,7 @@ import VoiceSelector from './VoiceSelector';
 import LoadingOverlay from './LoadingOverlay';
 import { useAuth } from '@clerk/nextjs';
 import { toast } from 'sonner';
-import { checkBookExists, createBook, processAndSaveSegments } from '@/lib/actions/book.actions';
+import { checkBookExists, createBook } from '@/lib/actions/book.actions';
 import { useRouter } from 'next/navigation';
 import { parsePDFFile } from '@/lib/utils';
 import { upload } from '@vercel/blob/client';
@@ -125,15 +125,17 @@ const UploadForm = () => {
                 return;
             }
 
-            // Server fetches PDF from Blob URL and extracts/saves segments — no huge payload
-            const segments = await processAndSaveSegments(
-                book.data._id,
-                userId,
-                uploadedPdfBlob.url,
-            );
+            // Call the API route directly — avoids Turbopack bundling issues that
+            // prevent pdfjs-dist from running inside a server action.
+            const segRes = await fetch('/api/process-segments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bookId: book.data._id, pdfUrl: uploadedPdfBlob.url }),
+            });
+            const segments = await segRes.json();
 
             if (!segments.success) {
-                toast.error('Failed to save book segments. Please try again.');
+                toast.error(segments.message ?? 'Failed to save book segments. Please try again.');
                 return;
             }
 
