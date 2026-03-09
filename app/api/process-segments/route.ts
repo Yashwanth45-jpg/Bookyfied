@@ -4,11 +4,7 @@ import { connectToDatabase } from '@/DataBase/mongoose';
 import { BookSegment } from '@/DataBase/models';
 import Book from '@/DataBase/models/book.model';
 import { splitIntoSegments } from '@/lib/utils';
-import * as pdfParseModule from 'pdf-parse';
-
-// pdf-parse ships both CJS and ESM; handle either export shape
-const pdfParse: (buf: Buffer) => Promise<{ text: string }> =
-    (pdfParseModule as any).default ?? (pdfParseModule as any).parse ?? pdfParseModule;
+import pdfParse from 'pdf-parse';
 
 export const maxDuration = 60;
 
