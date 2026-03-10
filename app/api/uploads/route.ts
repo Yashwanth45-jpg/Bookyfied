@@ -28,6 +28,7 @@ export async function POST(request: Request): Promise<NextResponse> {
                         'image/webp',
                     ],
                     maximumSizeInBytes: MAX_FILE_SIZE,
+                    addRandomSuffix: true,
                     tokenPayload: JSON.stringify({ userId }),
                 };
             },
