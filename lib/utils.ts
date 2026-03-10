@@ -128,13 +128,22 @@ export async function parsePDFFile(file: File) {
     // Convert canvas to data URL
     const coverDataURL = canvas.toDataURL('image/png');
 
+    // Sample first page for text to detect scanned/image-based PDFs early.
+    // Full extraction still happens server-side.
+    const textContent = await firstPage.getTextContent();
+    const firstPageText = textContent.items
+      .filter((item) => 'str' in item)
+      .map((item) => (item as { str: string }).str)
+      .join(' ')
+      .trim();
+    const hasText = firstPageText.length > 20;
+
     // Clean up PDF document resources
     await pdfDocument.destroy();
 
-    // Text extraction is done server-side (/api/process-segments) to avoid
-    // the ~4.5 MB Next.js body limit and support image-based (scanned) PDFs.
     return {
       numPages,
+      hasText,
       cover: coverDataURL,
     };
   } catch (error) {

@@ -70,6 +70,14 @@ const UploadForm = () => {
                 return;
             }
 
+            if (!parsedPDF.hasText) {
+                toast.warning(
+                    '⚠️ This PDF appears to be scanned or image-based and contains no selectable text. Please upload a text-based (searchable) PDF.',
+                    { duration: 8000 }
+                );
+                return;
+            }
+
             // Upload PDF using original filename (with extension) under books/ prefix.
             // addRandomSuffix is set server-side in /api/uploads token — prevents conflicts.
             const uploadedPdfBlob = await upload(`books/${pdfFile.name}`, pdfFile, {
