@@ -866,6 +866,59 @@ export default function BookHero({ isSignedIn }: { isSignedIn: boolean }) {
   const [animKey, setAnimKey]         = useState(0);
   const [flip, setFlip]               = useState<FlipState>(null);
   const [isMobile, setIsMobile]       = useState(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const playFlipSound = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new AudioContext();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      // Short white-noise burst shaped to sound like a paper rustle
+      const duration = 0.16;
+      const sampleRate = ctx.sampleRate;
+      const bufferSize = Math.floor(sampleRate * duration);
+      const buffer = ctx.createBuffer(1, bufferSize, sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+
+      // Bandpass around paper-rustle frequencies
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 2800;
+      bp.Q.value = 0.9;
+
+      // High-shelf to add crispness
+      const hs = ctx.createBiquadFilter();
+      hs.type = 'highshelf';
+      hs.frequency.value = 5000;
+      hs.gain.value = 6;
+
+      // Gain envelope: quick attack, fast exponential decay
+      const gain = ctx.createGain();
+      const now = ctx.currentTime;
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.28, now + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      source.connect(bp);
+      bp.connect(hs);
+      hs.connect(gain);
+      gain.connect(ctx.destination);
+      source.start(now);
+      source.stop(now + duration + 0.01);
+    } catch {
+      // Audio not available — silently ignore
+    }
+  };
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -885,6 +938,7 @@ export default function BookHero({ isSignedIn }: { isSignedIn: boolean }) {
       const next = Math.min(TOTAL_PAGES - 1, Math.max(0, pageRef.current + dir));
       if (next === pageRef.current) return;
       isChanging.current = true;
+      playFlipSound();
       const from = pageRef.current;
       pageRef.current = next;
       setFlip({ dir: dir > 0 ? 'fwd' : 'bwd', from });
