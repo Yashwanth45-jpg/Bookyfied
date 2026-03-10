@@ -58,7 +58,6 @@ const UploadForm = () => {
                 return;
             }
 
-            const fileTitle = data.title.replace(/\s+/g, '-').toLowerCase();
             const pdfFile = data.pdfFile;
 
             // Parse PDF client-side ONLY for cover image generation + empty-PDF guard.
@@ -71,29 +70,34 @@ const UploadForm = () => {
                 return;
             }
 
-            // Upload PDF directly to Vercel Blob (bypasses Next.js body size limit)
-            const uploadedPdfBlob = await upload(fileTitle, pdfFile, {
+            // Upload PDF using original filename (with extension) under books/ prefix.
+            // addRandomSuffix prevents conflicts when multiple users upload the same book.
+            const uploadedPdfBlob = await upload(`books/${pdfFile.name}`, pdfFile, {
                 access: 'public',
                 handleUploadUrl: '/api/uploads',
+                addRandomSuffix: true,
                 contentType: 'application/pdf',
             });
 
             let coverUrl: string;
 
             if (data.coverImage) {
-                const uploadedCoverBlob = await upload(`${fileTitle}_cover`, data.coverImage, {
+                const uploadedCoverBlob = await upload(`covers/${data.coverImage.name}`, data.coverImage, {
                     access: 'public',
                     handleUploadUrl: '/api/uploads',
+                    addRandomSuffix: true,
                     contentType: data.coverImage.type,
                 });
                 coverUrl = uploadedCoverBlob.url;
             } else {
                 // Auto-generate cover from first PDF page (canvas rendered client-side)
+                const coverName = pdfFile.name.replace(/\.pdf$/i, '_cover.png');
                 const response = await fetch(parsedPDF.cover);
                 const blob = await response.blob();
-                const uploadedCoverBlob = await upload(`${fileTitle}_cover.png`, blob, {
+                const uploadedCoverBlob = await upload(`covers/${coverName}`, blob, {
                     access: 'public',
                     handleUploadUrl: '/api/uploads',
+                    addRandomSuffix: true,
                     contentType: 'image/png',
                 });
                 coverUrl = uploadedCoverBlob.url;
