@@ -104,6 +104,7 @@ export async function parsePDFFile(file: File) {
     // Load PDF document
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
     const pdfDocument = await loadingTask.promise;
+    const numPages = pdfDocument.numPages;
 
     // Render first page as cover image
     const firstPage = await pdfDocument.getPage(1);
@@ -127,27 +128,13 @@ export async function parsePDFFile(file: File) {
     // Convert canvas to data URL
     const coverDataURL = canvas.toDataURL('image/png');
 
-    // Extract text from all pages
-    let fullText = '';
-
-    for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
-      const page = await pdfDocument.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-          .filter((item) => 'str' in item)
-          .map((item) => (item as { str: string }).str)
-          .join(' ');
-      fullText += pageText + '\n';
-    }
-
-    // Split text into segments for search
-    const segments = splitIntoSegments(fullText);
-
     // Clean up PDF document resources
     await pdfDocument.destroy();
 
+    // Text extraction is done server-side (/api/process-segments) to avoid
+    // the ~4.5 MB Next.js body limit and support image-based (scanned) PDFs.
     return {
-      content: segments,
+      numPages,
       cover: coverDataURL,
     };
   } catch (error) {

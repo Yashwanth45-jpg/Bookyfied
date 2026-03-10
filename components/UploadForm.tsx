@@ -66,7 +66,7 @@ const UploadForm = () => {
             // pass a large payload through a Next.js server action (would hit ~4.5 MB limit).
             const parsedPDF = await parsePDFFile(pdfFile);
 
-            if (parsedPDF.content.length === 0) {
+            if (parsedPDF.numPages === 0) {
                 toast.error('Failed to parse PDF. Please try again with a different file.');
                 return;
             }

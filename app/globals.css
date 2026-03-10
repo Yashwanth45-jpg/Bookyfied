@@ -734,6 +734,37 @@
       transform: translateY(-2px);
     }
   }
+
+  /* ===========================================
+     SONNER TOAST OVERRIDES
+     =========================================== */
+  .toast-error {
+    background: #fff6f4 !important;
+    border-color: rgba(102, 56, 32, 0.3) !important;
+    color: #663820 !important;
+
+    [data-icon] {
+      color: #663820 !important;
+    }
+  }
+  .toast-success {
+    background: #f4faf5 !important;
+    border-color: rgba(124, 154, 130, 0.4) !important;
+    color: #3d6b45 !important;
+
+    [data-icon] {
+      color: #3d6b45 !important;
+    }
+  }
+  .toast-info {
+    background: #f8f4e9 !important;
+    border-color: rgba(33, 42, 59, 0.2) !important;
+    color: #212a3b !important;
+
+    [data-icon] {
+      color: #212a3b !important;
+    }
+  }
 }
 
 /* Clerk Auth Button Overrides */

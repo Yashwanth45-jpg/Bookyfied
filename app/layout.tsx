@@ -34,7 +34,24 @@ export default function RootLayout({
       >
         <ClerkProvider>
           {children}
-          <Toaster/>
+          <Toaster
+            position="bottom-center"
+            toastOptions={{
+              style: {
+                background: '#f8f4e9',
+                color: '#212a3b',
+                border: '1px solid rgba(33,42,59,0.15)',
+                borderRadius: '0.75rem',
+                fontFamily: 'var(--font-mona-sans)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08), 0 16px 32px rgba(0,0,0,0.12)',
+              },
+              classNames: {
+                error: 'toast-error',
+                success: 'toast-success',
+                info: 'toast-info',
+              },
+            }}
+          />
         </ClerkProvider>
       </body>
     </html>
