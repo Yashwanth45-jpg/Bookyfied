@@ -866,24 +866,40 @@ export default function BookHero({ isSignedIn }: { isSignedIn: boolean }) {
   const [animKey, setAnimKey]         = useState(0);
   const [flip, setFlip]               = useState<FlipState>(null);
   const [isMobile, setIsMobile]       = useState(false);
-  const flipAudioRef = useRef<HTMLAudioElement | null>(null);
+  const flipAudioRef   = useRef<HTMLAudioElement | null>(null);
+  const audioUnlocked   = useRef(false);
 
-  // Unlock audio on first trusted gesture so wheel-triggered plays aren't
-  // blocked by Chrome's autoplay policy.
   useEffect(() => {
+    // Create and load the audio element imperatively to avoid SSR/hydration timing issues.
+    const audio = new Audio();
+    audio.preload = 'auto';
+    audio.src = '/BookFlip.mp3';
+    audio.load();
+    flipAudioRef.current = audio;
+
+    // Unlock audio context on first trusted gesture (click / keypress) so that
+    // subsequent wheel-triggered plays aren't blocked by Chrome's autoplay policy.
     const unlock = () => {
-      const audio = flipAudioRef.current;
-      if (!audio) return;
-      // Play + pause immediately to mark the element as "user-activated".
+      if (audioUnlocked.current) return;
       audio.volume = 0;
-      const p = audio.play();
-      if (p) p.then(() => { audio.pause(); audio.currentTime = 0; audio.volume = 1; }).catch(() => {});
+      audio.play()
+        .then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.volume = 1;
+          audioUnlocked.current = true;
+        })
+        .catch(() => {});
     };
-    window.addEventListener('pointerdown', unlock, { once: true, passive: true });
-    window.addEventListener('keydown',     unlock, { once: true, passive: true });
+
+    window.addEventListener('pointerdown', unlock, { passive: true });
+    window.addEventListener('keydown',     unlock, { passive: true });
+
     return () => {
       window.removeEventListener('pointerdown', unlock);
       window.removeEventListener('keydown',     unlock);
+      audio.pause();
+      audio.src = '';
     };
   }, []);
 
@@ -892,7 +908,7 @@ export default function BookHero({ isSignedIn }: { isSignedIn: boolean }) {
     if (!audio) return;
     audio.pause();
     audio.currentTime = 0;
-    void audio.play();
+    audio.play().catch(() => {});
   };
 
   useEffect(() => {
@@ -1024,9 +1040,6 @@ export default function BookHero({ isSignedIn }: { isSignedIn: boolean }) {
           .step-illustration svg { height: 150px !important; }
         }
       `}</style>
-
-      {/* Hidden audio element — rendered in DOM so browser tracks user-activation */}
-      <audio ref={flipAudioRef} src="/BookFlip.mp3" preload="auto" />
 
       {/* Full-screen fixed canvas — nothing scrolls */}
       <div
