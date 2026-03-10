@@ -71,11 +71,10 @@ const UploadForm = () => {
             }
 
             // Upload PDF using original filename (with extension) under books/ prefix.
-            // addRandomSuffix prevents conflicts when multiple users upload the same book.
+            // addRandomSuffix is set server-side in /api/uploads token — prevents conflicts.
             const uploadedPdfBlob = await upload(`books/${pdfFile.name}`, pdfFile, {
                 access: 'public',
                 handleUploadUrl: '/api/uploads',
-                addRandomSuffix: true,
                 contentType: 'application/pdf',
             });
 
@@ -85,7 +84,6 @@ const UploadForm = () => {
                 const uploadedCoverBlob = await upload(`covers/${data.coverImage.name}`, data.coverImage, {
                     access: 'public',
                     handleUploadUrl: '/api/uploads',
-                    addRandomSuffix: true,
                     contentType: data.coverImage.type,
                 });
                 coverUrl = uploadedCoverBlob.url;
@@ -97,7 +95,6 @@ const UploadForm = () => {
                 const uploadedCoverBlob = await upload(`covers/${coverName}`, blob, {
                     access: 'public',
                     handleUploadUrl: '/api/uploads',
-                    addRandomSuffix: true,
                     contentType: 'image/png',
                 });
                 coverUrl = uploadedCoverBlob.url;
