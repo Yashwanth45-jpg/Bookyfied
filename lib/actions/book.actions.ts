@@ -1,12 +1,14 @@
 'use server';
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/DataBase/mongoose";
-import { CreateBook } from "@/types";
+import { CreateBook, IBook } from "@/types";
 import {escapeRegex, generateSlug, serializeData} from "@/lib/utils";
 import Book from "@/DataBase/models/book.model";
 import { BookSegment } from "@/DataBase/models";
 import { revalidatePath } from "next/cache";
 import { getUserSubscriptionPlan } from "../subscription.server";
+import { auth } from "@clerk/nextjs/server";
+import { del } from "@vercel/blob";
 
 
 export const getAllBooks = async(clerkId: string, query?: string) => {
@@ -206,5 +208,52 @@ export const searchBookSegments = async (bookId: string, query: string, limit: n
             error: (error as Error).message,
             data: [],
         };
+    }
+};
+
+export const deleteBook = async (bookId: string) => {
+    try {
+        const { userId } = await auth();
+        if (!userId) {
+            return { success: false, message: 'Unauthorized' };
+        }
+
+        await connectToDatabase();
+
+        const book = await Book.findById(bookId).lean() as IBook | null;
+        if (!book) {
+            return { success: false, message: 'Book not found' };
+        }
+
+        if (book.clerkId !== userId) {
+            return { success: false, message: 'Unauthorized' };
+        }
+
+        // Delete blobs from Vercel storage
+        const urlsToDelete: string[] = [];
+        if (book.fileURL) urlsToDelete.push(book.fileURL);
+        if (book.coverURL) urlsToDelete.push(book.coverURL);
+
+        if (urlsToDelete.length > 0) {
+            try {
+                await del(urlsToDelete);
+            } catch (blobError) {
+                console.error('Failed to delete blobs (continuing):', blobError);
+            }
+        }
+
+        // Delete all segments for this book
+        await BookSegment.deleteMany({ bookId: new mongoose.Types.ObjectId(bookId) });
+
+        // Delete the book document
+        await Book.findByIdAndDelete(bookId);
+
+        revalidatePath('/library');
+        revalidatePath('/');
+
+        return { success: true, message: 'Book deleted successfully' };
+    } catch (error) {
+        console.error('Error deleting book:', error);
+        return { success: false, message: 'Failed to delete book' };
     }
 };
