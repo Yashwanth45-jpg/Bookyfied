@@ -866,69 +866,24 @@ export default function BookHero({ isSignedIn }: { isSignedIn: boolean }) {
   const [animKey, setAnimKey]         = useState(0);
   const [flip, setFlip]               = useState<FlipState>(null);
   const [isMobile, setIsMobile]       = useState(false);
-  const audioCtxRef = useRef<AudioContext | null>(null);
+  const flipAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const audio = new Audio('/BookFlip.mp3');
+    audio.preload = 'auto';
+    flipAudioRef.current = audio;
+    return () => { audio.pause(); };
+  }, []);
 
   const playFlipSound = () => {
-    if (typeof window === 'undefined') return;
+    const audio = flipAudioRef.current;
+    if (!audio) return;
     try {
-      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
-        audioCtxRef.current = new AudioContext();
-      }
-      const ctx = audioCtxRef.current;
-      if (ctx.state === 'suspended') ctx.resume();
-
-      const now = ctx.sampleRate;
-      const sampleRate = ctx.sampleRate;
-      const duration = 0.28;
-      const bufferSize = Math.floor(sampleRate * duration);
-      const buffer = ctx.createBuffer(1, bufferSize, sampleRate);
-      const data = buffer.getChannelData(0);
-
-      // Pink noise via Voss-McCartney approximation — much softer spectrum than white noise
-      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0;
-      for (let i = 0; i < bufferSize; i++) {
-        const w = Math.random() * 2 - 1;
-        b0 = 0.99886 * b0 + w * 0.0555179;
-        b1 = 0.99332 * b1 + w * 0.0750759;
-        b2 = 0.96900 * b2 + w * 0.1538520;
-        b3 = 0.86650 * b3 + w * 0.3104856;
-        b4 = 0.55000 * b4 + w * 0.5329522;
-        b5 = -0.7616 * b5 - w * 0.0168980;
-        // Keep amplitude low for a whisper-soft rustle
-        data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + w * 0.5362) * 0.055;
-      }
-
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-
-      // Gentle lowpass — rolls off harshness above ~1 kHz
-      const lp = ctx.createBiquadFilter();
-      lp.type = 'lowpass';
-      lp.frequency.value = 1100;
-      lp.Q.value = 0.4;
-
-      // Soft notch around 800 Hz to thin the midrange slightly
-      const notch = ctx.createBiquadFilter();
-      notch.type = 'peaking';
-      notch.frequency.value = 800;
-      notch.Q.value = 1.2;
-      notch.gain.value = -4;
-
-      // Smooth swoosh envelope: gradual rise, long tail
-      const gain = ctx.createGain();
-      const t = ctx.currentTime;
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.18, t + 0.025); // slow rise
-      gain.gain.setTargetAtTime(0.0001, t + 0.06, 0.07);  // smooth exponential tail
-
-      source.connect(lp);
-      lp.connect(notch);
-      notch.connect(gain);
-      gain.connect(ctx.destination);
-      source.start(t);
-      source.stop(t + duration + 0.02);
+      audio.pause();
+      audio.currentTime = 0;
+      audio.play().catch(() => {/* autoplay policy — silently ignore */});
     } catch {
-      // Audio not available — silently ignore
+      // ignore
     }
   };
 
